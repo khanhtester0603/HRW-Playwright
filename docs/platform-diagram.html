@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kiến trúc HRW Playwright</title>
+  <style>
+    :root { color-scheme: light; color: #2d3142; background: #f5f5f5;
+      font-family: Geist, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1360px; margin: auto; padding: 44px clamp(16px, 3vw, 40px) 64px; }
+    h1, h2 { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; line-height: 1.15; }
+    h1 { font-size: clamp(36px, 5vw, 64px); margin: 8px 0; }
+    h2 { font-size: 32px; margin: 0 0 16px; }
+    p, li { line-height: 1.6; }
+    header p, section > p { max-width: 82ch; color: #4f5d75; }
+    section { margin-top: 44px; scroll-margin-top: 20px; }
+    nav { display: flex; gap: 12px 24px; flex-wrap: wrap; padding: 16px 0; border-bottom: 1px solid #bfc0c0; }
+    a { color: #2e5aa8; text-underline-offset: 3px; }
+    code, .tag, .sub, .arrow-label { font-family: "Geist Mono", ui-monospace, monospace; }
+    .eyebrow, .tag { font-size: 11px; letter-spacing: .12em; font-weight: 600; }
+    svg { width: 100%; min-width: 1280px; height: auto; display: block; }
+    .diagram-container, .table-container { overflow-x: auto; border: 1px solid #bfc0c0; border-radius: 6px; }
+    .name { font-size: 18px; font-weight: 600; fill: #2d3142; }
+    .tag, .sub, .arrow-label { fill: #4f5d75; }
+    .sub { font-size: 12px; }
+    .arrow-label { font-size: 10px; letter-spacing: .08em; }
+    table { width: 100%; min-width: 700px; border-collapse: collapse; text-align: left; }
+    th, td { padding: 12px 16px; vertical-align: top; line-height: 1.55; }
+    tr + tr, thead + tbody { border-top: 1px solid #bfc0c0; }
+    th { background: #ececec; }
+    @media print { .diagram-container, .table-container { overflow: visible; }
+      svg, table { min-width: 0; } section, figure { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">HRW PLAYWRIGHT · TÀI LIỆU KỸ THUẬT</p>
+    <h1>Kiến trúc Platform regression</h1>
+    <p>Hiện trạng theo mã nguồn ngày 26/11/2026. Platform quản lý bộ test, điều phối Playwright và đối chiếu kết quả giữa các lần chạy.</p>
+    <nav aria-label="Mục lục">
+      <a href="#kien-truc">Kiến trúc</a>
+      <a href="#vong-doi">Vòng đời lần chạy</a>
+      <a href="#tham-chieu">Điểm sửa mã</a>
+    </nav>
+  </header>
+  <section id="kien-truc">
+    <h2>Kiến trúc và luồng dữ liệu</h2>
+    <div class="diagram-container" tabindex="0" aria-label="Kiến trúc HRW Playwright">
+      <svg viewBox="0 0 1280 720" role="img" aria-labelledby="platform-diagram-title platform-diagram-desc">
+        <title id="platform-diagram-title">Kiến trúc HRW Playwright</title>
+        <desc id="platform-diagram-desc">Giao diện và CI gọi API Node.js để điều phối Playwright và lưu kết quả trên đĩa cục bộ.</desc>
+        <defs>
+          <marker id="platform-diagram-flow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#4f5d75"/></marker>
+          <marker id="platform-diagram-http" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#2e5aa8"/></marker>
+          <pattern id="platform-diagram-dots" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="0.7" fill="#2d3142" opacity=".13"/></pattern>
+        </defs>
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+        <rect width="1280" height="720" fill="url(#platform-diagram-dots)"/>
+<rect x="300" y="64" width="580" height="536" rx="8" fill="#ececec" fill-opacity=".62" stroke="#bfc0c0" stroke-dasharray="5 4"/>
+<text class="tag" x="320" y="92">TIẾN TRÌNH VÀ DỮ LIỆU PLATFORM</text>
+        <path d="M 240,188 H 272 Q 280,188 280,196 V 256 Q 280,264 288,264 H 320" fill="none" stroke="#2e5aa8" stroke-width="1.5" marker-end="url(#platform-diagram-http)"/>
+        <path d="M 240,392 H 272 Q 280,392 280,384 V 288 Q 280,280 288,280 H 320" fill="none" stroke="#2e5aa8" stroke-width="1.5" marker-end="url(#platform-diagram-http)"/>
+        <path d="M 536,280 H 624" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#platform-diagram-flow)"/>
+        <rect x="556" y="257" width="48" height="16" rx="2" fill="#f5f5f5"/>
+        <text class="arrow-label" x="580" y="270" text-anchor="middle">SPAWN</text>
+        <path d="M 844,264 H 904 Q 912,264 912,256 V 144 Q 912,136 920,136 H 944" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#platform-diagram-flow)"/>
+        <path d="M 1068,184 V 272" fill="none" stroke="#2e5aa8" stroke-width="1.5" marker-end="url(#platform-diagram-http)"/>
+        <rect x="1075.5" y="216" width="61" height="16" rx="2" fill="#f5f5f5"/>
+        <text class="arrow-label" x="1106" y="229" text-anchor="middle">BROWSER</text>
+        <path d="M 734,328 V 488" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#platform-diagram-flow)"/>
+        <rect x="742.5" y="397" width="75" height="16" rx="2" fill="#f5f5f5"/>
+        <text class="arrow-label" x="780" y="410" text-anchor="middle">ARTIFACTS</text>
+        <path d="M 428,328 V 528 Q 428,536 436,536 H 624" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#platform-diagram-flow)"/>
+        <rect x="442" y="513" width="96" height="16" rx="2" fill="#f5f5f5"/>
+        <text class="arrow-label" x="490" y="526" text-anchor="middle">STATE / READ</text>
+        <g id="ui" data-node-id="ui" transform="translate(40 128)">
+          <rect width="200" height="120" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21" fill="#2d3142">GIAO DIỆN WEB</text>
+          <text class="name" x="16" y="48">HRW Playwright</text>
+          <text class="sub" x="16" y="70">Bộ test · Thực thi</text><text class="sub" x="16" y="86">Lịch sử · So sánh</text>
+        </g>
+        <g id="ci" data-node-id="ci" transform="translate(40 344)">
+          <rect width="200" height="96" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21" fill="#2d3142">TÍCH HỢP</text>
+          <text class="name" x="16" y="48">CI sau build</text>
+          <text class="sub" x="16" y="70">POST /api/runs</text>
+        </g>
+        <g id="api" data-node-id="api" transform="translate(320 232)">
+          <rect width="216" height="96" rx="6" fill="#f8ebe7" stroke="#bf4520"/>
+          <text class="tag" x="16" y="21" fill="#bf4520">NODE:HTTP</text>
+          <text class="name" x="16" y="48">Platform API</text>
+          <text class="sub" x="16" y="70">Suite · Run · Artifact</text>
+        </g>
+        <g id="runner" data-node-id="runner" transform="translate(624 232)">
+          <rect width="220" height="96" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21" fill="#2d3142">TIẾN TRÌNH CON</text>
+          <text class="name" x="16" y="48">Playwright CLI</text>
+          <text class="sub" x="16" y="70">Chạy suite / liệt kê case</text>
+        </g>
+        <g id="storage" data-node-id="storage" transform="translate(624 488)">
+          <rect width="220" height="96" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21" fill="#2d3142">ĐĨA CỤC BỘ</text>
+          <text class="name" x="16" y="48">Dữ liệu Platform</text>
+          <text class="sub" x="16" y="70">state.json · log · JSON</text>
+        </g>
+        <g id="tests" data-node-id="tests" transform="translate(944 80)">
+          <rect width="248" height="104" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21" fill="#2d3142">CHECKOUT HIỆN TẠI</text>
+          <text class="name" x="16" y="48">Test &amp; cấu hình</text>
+          <text class="sub" x="16" y="70">tests/{staging,production}</text><text class="sub" x="16" y="86">Fixtures · Page Objects</text>
+        </g>
+        <g id="targets" data-node-id="targets" transform="translate(944 272)">
+          <rect width="248" height="104" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21" fill="#2d3142">ĐỐI TƯỢNG KIỂM THỬ</text>
+          <text class="name" x="16" y="48">Ứng dụng &amp; fixture</text>
+          <text class="sub" x="16" y="70">HaraWorks · Zuizui</text><text class="sub" x="16" y="86">Cart HTML cục bộ</text>
+        </g>
+<path d="M 40,648 H 1240" stroke="#bfc0c0"/>
+<text class="sub" x="40" y="677">Mũi tên xanh · HTTP / trình duyệt</text>
+<text class="sub" x="358" y="677">Mũi tên xám · gọi tiến trình / truy cập dữ liệu</text>
+<text class="sub" x="774" y="677">Viền đứt · nhóm runtime và dữ liệu Platform</text>
+      </svg>
+    </div>
+    <ul>
+      <li><strong>Khởi động.</strong> <code>npm start</code> chạy Node HTTP trên <code>127.0.0.1</code>, mặc định cổng <code>4173</code>. Server kiểm tra Host và Origin nếu có. Có nhánh hỗ trợ yêu cầu do Tailnet chuyển tiếp theo cấu hình <code>HRW_TAILSCALE_HOST</code>.</li>
+      <li><strong>Chọn test.</strong> Playwright đọc test từ checkout trên máy chạy Platform. Suite lưu tên, mô tả, môi trường và tag. API checklist gọi Playwright với <code>--list</code> để đọc case và annotation; khi thực thi, CLI chọn thư mục theo môi trường và lọc tag nếu có. Mã build là nhãn để tra cứu và so sánh.</li>
+      <li><strong>Lưu dữ liệu.</strong> <code>state.json</code> chứa cấu hình suite và lịch sử, gồm bản sao suite và kết quả case theo lần chạy. Thư mục <code>&lt;run-id&gt;/</code> chứa <code>run.log</code>, <code>results.json</code> và <code>artifacts/</code> khi có. Đường dẫn gốc mặc định là <code>.platform-data/</code>, có thể đổi qua <code>HRW_DATA_DIR</code>.</li>
+    </ul>
+  </section>
+  <section id="vong-doi">
+    <h2>Vòng đời lần chạy</h2>
+    <div class="diagram-container" tabindex="0" aria-label="Vòng đời lần chạy">
+      <svg viewBox="0 0 1280 720" role="img" aria-labelledby="run-state-title run-state-desc">
+        <title id="run-state-title">Vòng đời lần chạy</title>
+        <desc id="run-state-desc">Một lần chạy từ hàng đợi chuyển sang đang chạy rồi kết thúc bằng passed, failed hoặc error.</desc>
+        <defs>
+          <marker id="run-state-flow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#4f5d75"/></marker>
+          <marker id="run-state-http" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#2e5aa8"/></marker>
+          <pattern id="run-state-dots" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="0.7" fill="#2d3142" opacity=".13"/></pattern>
+        </defs>
+        <rect width="1280" height="720" fill="#f5f5f5"/>
+        <rect width="1280" height="720" fill="url(#run-state-dots)"/>
+<text class="tag" x="64" y="252">THỰC THI</text>
+<text class="tag" x="948" y="96">KẾT QUẢ CUỐI</text>
+        <path d="M 264,352 H 496" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#run-state-flow)"/>
+        <rect x="349.5" y="329" width="61" height="16" rx="2" fill="#f5f5f5"/>
+        <text class="arrow-label" x="380" y="342" text-anchor="middle">CÓ SLOT</text>
+        <path d="M 736,320 H 828 Q 836,320 836,312 V 184 Q 836,176 844,176 H 948" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#run-state-flow)"/>
+        <rect x="872" y="153" width="54" height="16" rx="2" fill="#f5f5f5"/>
+        <text class="arrow-label" x="899" y="166" text-anchor="middle">EXIT 0</text>
+        <path d="M 736,352 H 948" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#run-state-flow)"/>
+        <rect x="808" y="329" width="68" height="16" rx="2" fill="#f5f5f5"/>
+        <text class="arrow-label" x="842" y="342" text-anchor="middle">CASE LỖI</text>
+        <path d="M 736,384 H 828 Q 836,384 836,392 V 520 Q 836,528 844,528 H 948" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#run-state-flow)"/>
+        <rect x="864.5" y="505" width="61" height="16" rx="2" fill="#f5f5f5"/>
+        <text class="arrow-label" x="895" y="518" text-anchor="middle">LỖI RUN</text>
+        <g id="queued" data-node-id="queued" transform="translate(64 288)">
+          <rect width="200" height="128" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21" fill="#2d3142">ĐANG CHỜ</text>
+          <text class="name" x="16" y="48">queued</text>
+          <text class="sub" x="16" y="70">Suite snapshot</text><text class="sub" x="16" y="86">Xếp hàng theo FIFO</text>
+        </g>
+        <g id="running" data-node-id="running" transform="translate(496 288)">
+          <rect width="240" height="128" rx="6" fill="#f8ebe7" stroke="#bf4520"/>
+          <text class="tag" x="16" y="21" fill="#bf4520">ĐANG CHẠY</text>
+          <text class="name" x="16" y="48">running</text>
+          <text class="sub" x="16" y="70">Một run tại mỗi thời điểm</text><text class="sub" x="16" y="86">Ghi log và artifact</text>
+        </g>
+        <g id="passed" data-node-id="passed" transform="translate(948 120)">
+          <rect width="240" height="112" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21" fill="#2d3142">HOÀN TẤT</text>
+          <text class="name" x="16" y="48">passed</text>
+          <text class="sub" x="16" y="70">Có case và exit code = 0</text>
+        </g>
+        <g id="failed" data-node-id="failed" transform="translate(948 296)">
+          <rect width="240" height="112" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21" fill="#2d3142">HOÀN TẤT</text>
+          <text class="name" x="16" y="48">failed</text>
+          <text class="sub" x="16" y="70">Exit khác 0 · có case lỗi</text>
+        </g>
+        <g id="error" data-node-id="error" transform="translate(948 472)">
+          <rect width="240" height="112" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21" fill="#2d3142">LỖI THỰC THI</text>
+          <text class="name" x="16" y="48">error</text>
+          <text class="sub" x="16" y="70">Báo cáo / runner lỗi</text><text class="sub" x="16" y="86">Hoặc gián đoạn khi dừng</text>
+        </g>
+<path d="M 40,648 H 1240" stroke="#bfc0c0"/>
+<text class="sub" x="40" y="677">Nhánh được quyết định khi tiến trình con kết thúc hoặc khi Platform phục hồi trạng thái lúc khởi động.</text>
+      </svg>
+    </div>
+    <ul>
+      <li><code>POST /api/runs</code> lưu lần chạy, gọi bộ điều phối và trả HTTP 202. Một tiến trình chạy test tại một thời điểm; API checklist có thể khởi chạy riêng một tiến trình liệt kê.</li>
+      <li>Trong lúc chờ hoặc đang chạy, trang chi tiết đọc lại API mỗi 800 ms. Reporter đẩy tiến độ qua stdout/stderr; server ghi vào log và đọc JSON khi tiến trình con kết thúc.</li>
+      <li>Điều kiện <code>error</code> được xét trước <code>passed</code> và <code>failed</code>: lỗi cấp báo cáo, thiếu báo cáo/case hoặc exit khác 0 mà không có case <code>unexpected</code>. Khi khởi động lại, lần chạy còn <code>running</code> chuyển sang <code>error</code> và hàng đợi tiếp tục.</li>
+    </ul>
+  </section>
+  <section id="tham-chieu">
+    <h2>Điểm sửa mã</h2>
+    <div class="table-container" tabindex="0" aria-label="Bảng đối chiếu mã nguồn">
+      <table>
+        <thead><tr><th scope="col">Khi phát triển</th><th scope="col">Vị trí trong repo</th><th scope="col">Hành vi hiện tại</th></tr></thead>
+        <tbody>
+          <tr><td>Đổi màn hình hoặc điều hướng</td><td><a href="../platform/public/app.js">app.js</a> · <a href="../platform/public/index.html">index.html</a> · <a href="../platform/public/style.css">style.css</a></td><td><code>render()</code> điều hướng theo hash; <code>comparison()</code> so khớp ID case ở hai run của cùng suite.</td></tr>
+          <tr><td>Thay API suite hoặc checklist</td><td><a href="../platform/server.js">server.js</a> · <a href="../fixtures/checklist.js">checklist.js</a></td><td><code>route()</code> xử lý suite CRUD; <code>suiteValues()</code> kiểm tra dữ liệu; <code>listSuiteCases()</code> đọc annotation checklist.</td></tr>
+          <tr><td>Đổi hàng đợi hoặc lưu trữ</td><td><a href="../platform/server.js">server.js</a></td><td><code>work()</code>, <code>loadState()</code> và <code>save()</code> quản lý tiến trình con, phục hồi và ghi JSON qua tệp tạm. Xóa lịch sử bị từ chối khi có run đang chờ hoặc đang chạy.</td></tr>
+          <tr><td>Thêm test hoặc môi trường</td><td><a href="../tests/production/">tests/production</a> · <a href="../tests/staging/">tests/staging</a> · <a href="../environments/index.js">environments/index.js</a></td><td>Production chứa HaraWorks và Thư Nội Bộ; staging chứa đăng nhập Zuizui và giỏ hàng mẫu. <code>playwrightArgs()</code> chọn thư mục và lọc tag.</td></tr>
+          <tr><td>Đổi log, kết quả hoặc artifact</td><td><a href="../platform/reporter.js">reporter.js</a> · <a href="../playwright.config.js">playwright.config.js</a> · <a href="../platform/server.js">server.js</a></td><td>Reporter tùy chỉnh ghi tiến độ; JSON reporter tạo dữ liệu cho <code>readResults()</code>. API run cung cấp chi tiết, log, JSON và artifact.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Để cập nhật sơ đồ, sửa trực tiếp SVG trong tệp HTML này. Mỗi khối có <code>data-node-id</code> riêng. Khi đổi một khối hoặc trạng thái, cập nhật mũi tên và hàng tham chiếu tương ứng, rồi mở lại tệp để kiểm tra.</p>
+  </section>
+</main>
+</body>
+</html>

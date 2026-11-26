@@ -1,0 +1,17 @@
+{
+  "devDependencies": {
+    "@playwright/test": "1.58.2"
+  },
+  "name": "hrw-playwright",
+  "scripts": {
+    "test": "playwright test --grep-invert \"@zuizui|@haraworks-home|@tnb\"",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:report": "playwright show-report",
+    "start": "node platform/server.js",
+    "test:zuizui": "playwright test --grep @zuizui",
+    "test:haraworks": "playwright test --grep @haraworks-home",
+    "test:tnb": "playwright test --grep @tnb --retries=0",
+    "test:tnb:menu": "playwright test --grep @tnb-menu --workers=1"
+  },
+  "private": true
+}

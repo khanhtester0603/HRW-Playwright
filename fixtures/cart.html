@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Giỏ hàng mẫu</title>
+</head>
+<body>
+  <main>
+    <h1>Giỏ hàng mẫu</h1>
+    <p>Sổ tay · <span id="unit-price"></span></p>
+    <button type="button" id="add">Thêm sổ tay</button>
+    <button type="button" id="clear">Xóa giỏ hàng</button>
+    <p><label for="quantity">Số lượng</label> <output id="quantity">0</output></p>
+    <p><label for="total">Tổng tiền</label> <output id="total">0 ₫</output></p>
+  </main>
+  <script>
+    const regression = new URLSearchParams(location.search).get('regression');
+    const unitPrice = regression === 'price' ? 60_000 : 50_000;
+    const formatter = new Intl.NumberFormat('vi-VN');
+    const formatPrice = (value) => formatter.format(value) + ' ₫';
+    const quantity = document.getElementById('quantity');
+    const total = document.getElementById('total');
+    let count = 0;
+
+    document.getElementById('unit-price').textContent = formatPrice(unitPrice);
+
+    function renderCart() {
+      quantity.value = String(count);
+      total.value = formatPrice(count * unitPrice);
+    }
+
+    document.getElementById('add').addEventListener('click', () => {
+      count += 1;
+      renderCart();
+    });
+
+    document.getElementById('clear').addEventListener('click', () => {
+      count = 0;
+      renderCart();
+    });
+  </script>
+</body>
+</html>

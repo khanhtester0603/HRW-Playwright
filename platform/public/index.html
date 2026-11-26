@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#15142b">
+  <title>HRW Playwright · Regression Testing</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a href="#home" class="brand"><span class="brand-icon" aria-hidden="true">⟫</span><span>HRW Playwright<small>Regression Testing</small></span></a>
+    <div class="nav-label">WORKSPACE</div>
+    <nav aria-label="Điều hướng chính">
+      <a href="#home" data-nav="home"><span aria-hidden="true">⊞</span> Tổng quan</a>
+      <a href="#suites" data-nav="suites"><span aria-hidden="true">▤</span> Test Script</a>
+      <a href="#execute" data-nav="execute"><span aria-hidden="true">▷</span> Thực thi</a>
+      <a href="#reports" data-nav="reports"><span aria-hidden="true">◷</span> Báo cáo &amp; so sánh</a>
+    </nav>
+    <div class="sidebar-footer"><i></i><span>Workspace cục bộ<small>Playwright Runner</small></span></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><span>Workspace <b>›</b> <strong id="breadcrumb">Tổng quan</strong></span><span class="topbar-local"><i></i> Local</span></header>
+    <main id="app" aria-busy="true"><p>Đang tải workspace…</p></main>
+  </div>
+  <dialog id="suite-dialog">
+    <form id="suite-form">
+      <div class="dialog-head"><h2 id="dialog-title">Tạo Test Script</h2><button type="button" class="close" id="close-dialog" aria-label="Đóng">×</button></div>
+      <div id="suite-error" class="form-error" role="alert" hidden></div>
+      <label>Tên Test Script<input name="name" maxlength="80" required placeholder="Ví dụ Smoke giỏ hàng"></label>
+      <label>Môi trường<select name="environment" required>
+        <option value="staging">Staging · zuizui.io</option>
+        <option value="production">Production · haraworks.vn</option>
+      </select></label>
+      <label>Tag Playwright<input name="tag" maxlength="48" pattern="@[a-zA-Z0-9_\-]+" placeholder="@smoke"><small>Để trống để chạy tất cả test trong môi trường đã chọn.</small></label>
+      <label>Mô tả<textarea name="description" maxlength="300" rows="3" placeholder="Phạm vi kiểm thử"></textarea></label>
+      <div class="actions"><button type="button" class="button secondary" id="cancel-dialog">Hủy</button><button class="button primary">Lưu Test Script</button></div>
+    </form>
+  </dialog>
+  <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-description">
+    <form id="delete-form">
+      <div class="dialog-head"><h2 id="delete-title">Xóa Test Script?</h2><button type="button" class="close" id="close-delete" aria-label="Đóng">×</button></div>
+      <p id="delete-description"></p>
+      <label class="delete-option">
+        <input type="checkbox" name="deleteHistory">
+        <span>Xóa cả lịch sử chạy<small>Xóa vĩnh viễn kết quả, log và tệp đính kèm của Test Script này.</small></span>
+      </label>
+      <div class="form-error" role="alert" hidden></div>
+      <div class="actions"><button type="button" class="button secondary" id="cancel-delete" autofocus>Hủy</button><button class="button destructive">Xóa Test Script</button></div>
+    </form>
+  </dialog>
+</body>
+</html>
