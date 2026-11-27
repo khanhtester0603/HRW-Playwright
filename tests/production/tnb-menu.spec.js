@@ -1,5 +1,5 @@
 const { checklist } = require('../../fixtures/checklist');
-const { test, expect } = require('@playwright/test');
+const { test, expect, openTestSession } = require('../../fixtures/platform-test');
 const { loginToHaraworks } = require('../../environments/production/pages/login-page');
 
 const { production: { mailOrigin } } = require('../../environments');
@@ -23,15 +23,17 @@ test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 test.describe('Truy cập menu Thư Nội Bộ bằng admin', { tag: ['@tnb', '@tnb-menu'] }, () => {
   test.describe.configure({ mode: 'default' });
   let page;
+  let session;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
-    page = await browser.newPage();
+    session = await openTestSession(browser);
+    page = await session.newPage();
     await loginToHaraworks(page, 'admin');
   });
 
   test.afterAll(async () => {
-    await page?.context().close();
+    await session?.release();
   });
 
   for (const [name, path] of menus) {

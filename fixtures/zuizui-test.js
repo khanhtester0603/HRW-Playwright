@@ -1,4 +1,4 @@
-const { test: base, expect } = require('@playwright/test');
+const { test: base, expect } = require('./platform-test');
 const { accountForRole } = require('../environments/staging/accounts');
 const { openOrgForm, selectOrganization, submitLogin, expectWorkplace } = require('../environments/staging/pages/login-page');
 

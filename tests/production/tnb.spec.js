@@ -1,6 +1,6 @@
 const { checklist } = require('../../fixtures/checklist');
 const { randomUUID } = require('node:crypto');
-const { test, expect } = require('@playwright/test');
+const { test, expect, openTestSession } = require('../../fixtures/platform-test');
 const { loginToHaraworks } = require('../../environments/production/pages/login-page');
 const { accountForRole } = require('../../environments/production/accounts');
 
@@ -49,15 +49,15 @@ test('TNB · Admin gửi thư nội bộ và AUTO000340 nhận được', { tag:
     await senderMail.expectSent(subject);
   });
 
-  const receiverContext = await browser.newContext();
+  const receiverSession = await openTestSession(browser);
   try {
-    const receiverPage = await receiverContext.newPage();
+    const receiverPage = await receiverSession.newPage();
     await loginToHaraworks(receiverPage, receiverRole);
 
     await test.step('Mở hộp thư đến của AUTO000340 và đối chiếu nội dung', async () => {
       await new InternalMailPage(receiverPage).expectReceived(subject, message);
     });
   } finally {
-    await receiverContext.close();
+    await receiverSession.release();
   }
 });

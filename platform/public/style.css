@@ -84,9 +84,11 @@ td a { overflow-wrap: anywhere; }
 .passed, .expected, .fixed { color: #146046; background: #e4f6ed; }
 .failed, .unexpected, .error, .regressed { color: #9d2448; background: #fbe9ef; }
 .running, .added { color: #4d34b5; background: #efeaff; }
-.queued, .flaky { color: #835501; background: #fff2d8; }
+.queued, .stopping, .flaky { color: #835501; background: #fff2d8; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 label { display: grid; gap: 7px; color: var(--ink); font-size: 13px; font-weight: 650; min-width: 0; }
+.headed-option { display: flex; align-items: flex-start; margin: 12px 0; }
+.headed-option input { margin: 2px 0 0; }
 label small { color: var(--muted); font-weight: 400; }
 input:not([type=checkbox]), textarea, select { width: 100%; padding: 10px; border: 1px solid #d9d8e6; border-radius: 7px; background: #fff; color: var(--ink); }
 textarea { resize: vertical; }
@@ -138,6 +140,7 @@ dialog .actions { justify-content: flex-end; }
 .checklist-case summary { padding: 12px 14px; cursor: pointer; font-weight: 600; }
 .checklist-case summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .checklist-count { margin-left: 8px; font-size: .85em; font-weight: 400; }
+.case-actions { margin: 0 14px 14px; }
 .checklist-case ol, .checklist-case p { margin: 0 14px 14px; }
 .checklist-case ol { padding-left: 24px; }
 .checklist-case li + li { margin-top: 6px; }

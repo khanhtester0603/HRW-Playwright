@@ -1,5 +1,5 @@
 const { checklist } = require('../../fixtures/checklist');
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../../fixtures/platform-test');
 const { loginToHaraworks } = require('../../environments/production/pages/login-page');
 
 const { production: { appOrigin } } = require('../../environments');

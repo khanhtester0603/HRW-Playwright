@@ -1,5 +1,5 @@
 const { checklist } = require('../../fixtures/checklist');
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('../../fixtures/platform-test');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 

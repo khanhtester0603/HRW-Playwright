@@ -17,6 +17,7 @@ fs.mkdirSync(data, { recursive: true });
 
 const stateFile = path.join(data, 'state.json');
 let state;
+const activeStatuses = ['queued', 'running', 'stopping'];
 const initialState = {
   suites: [
     { id: 'tnb-menu', name: 'TNB – Truy cập menu', tag: '@tnb-menu', description: 'Kiểm tra admin truy cập 11 menu Thư Nội Bộ.' },
@@ -47,6 +48,10 @@ function loadState() {
     run.status = 'error';
     run.finishedAt = new Date().toISOString();
     run.error = 'Platform đã dừng trước khi lần chạy hoàn tất.';
+  }
+  for (const run of state.runs.filter(run => run.status === 'stopping')) {
+    run.status = 'stopped';
+    run.finishedAt = new Date().toISOString();
   }
   save();
 }
@@ -104,20 +109,66 @@ async function listSuiteCases(suite) {
   }
 
   const cases = [];
-  function visit(group) {
+  function visit(group, parents = []) {
     for (const spec of group.specs || []) {
       const steps = (spec.tests[0]?.annotations || [])
         .filter(annotation => annotation.type === 'checklist-step' && annotation.description)
         .map(annotation => annotation.description);
-      cases.push({ id: spec.id, title: spec.title, steps });
+      cases.push({
+        id: spec.id, title: spec.title, steps,
+        file: spec.file, titles: [...parents, spec.title],
+        project: spec.tests[0]?.projectName,
+      });
     }
-    for (const child of group.suites || []) visit(child);
+    for (const child of group.suites || []) visit(child, [...parents, child.title]);
   }
   for (const group of report.suites) visit(group);
   return cases;
 }
 
+async function selectCase(suite, id) {
+  const cases = await listSuiteCases(suite);
+  const selected = cases.find(test => test.id === id);
+  if (!selected) throw bad('Case không còn thuộc Test Script. Hãy tải lại danh sách.', 404);
+  const { file, titles, project } = selected;
+  const parts = ['[' + project + ']', file, ...titles];
+  const ambiguous = cases.some(test => test !== selected && test.project === project &&
+    test.file === file && titles.every((title, index) => test.titles[index] === title));
+  if (ambiguous || parts.some(part => !part || part !== part.trim() || /[›\r\n]/.test(part))) {
+    throw bad('Playwright không thể chọn duy nhất case này.', 422);
+  }
+  return { id, title: selected.title, selector: parts.join(' › ') };
+}
+
+const useProcessGroup = process.platform !== 'win32';
 let child;
+let stopTimer;
+
+function signalRunner(processToStop, signal) {
+  if (!processToStop.pid) return;
+  try {
+    if (useProcessGroup) process.kill(-processToStop.pid, signal);
+    else processToStop.kill(signal);
+  } catch (error) {
+    if (error.code !== 'ESRCH') console.error(error);
+  }
+}
+
+function stopRun(run) {
+  if (run.status === 'stopping' || run.status === 'stopped') return;
+  if (run.status !== 'running' || !child) throw bad('Lần chạy này hiện không thể dừng.', 409);
+  run.status = 'stopping';
+  try {
+    save();
+  } catch (error) {
+    run.status = 'running';
+    throw error;
+  }
+  const processToStop = child;
+  signalRunner(processToStop, 'SIGINT');
+  stopTimer = setTimeout(() => signalRunner(processToStop, 'SIGKILL'), 3_000);
+}
+
 function work() {
   if (child) return;
   const run = state.runs.findLast(run => run.status === 'queued');
@@ -131,14 +182,22 @@ function work() {
   run.startedAt = new Date().toISOString();
   save();
   const args = playwrightArgs(run.suite);
+  if (run.headed) args.push('--headed');
+  if (run.selectedCase) {
+    const selectionFile = path.join(dir, 'test-list.txt');
+    fs.writeFileSync(selectionFile, run.selectedCase.selector + '\n');
+    args.push('--test-list', selectionFile, '--no-deps');
+  }
   child = spawn(process.execPath, args, {
     cwd: root,
+    detached: useProcessGroup,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
       FORCE_COLOR: '0',
       DEMO_REGRESSION: run.regression ? '1' : '0',
       HRW_PLATFORM_RUN: '1',
+      HRW_KEEP_BROWSER: run.headed ? '1' : '0',
       HRW_TEST_OUTPUT: output,
       PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile,
     },
@@ -150,6 +209,9 @@ function work() {
     stream.on('data', chunk => fs.appendFileSync(logFile, chunk));
   }
   child.once('close', code => {
+    clearTimeout(stopTimer);
+    const stopping = run.status === 'stopping';
+    if (stopping && useProcessGroup) signalRunner(child, 'SIGKILL');
     run.finishedAt = new Date().toISOString();
     try {
       const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
@@ -162,6 +224,10 @@ function work() {
     } catch {
       run.error = launchError || 'Playwright không tạo được báo cáo. Xem nhật ký để biết chi tiết.';
       run.status = 'error';
+    }
+    if (stopping) {
+      run.status = 'stopped';
+      delete run.error;
     }
     save();
     child = undefined;
@@ -236,7 +302,8 @@ const staticFiles = {
 };
 
 function summary(run) {
-  const { cases, ...meta } = run;
+  const { cases, selectedCase, ...meta } = run;
+  if (selectedCase) meta.selectedCase = { id: selectedCase.id, title: selectedCase.title };
   const counts = { expected: 0, unexpected: 0, flaky: 0, skipped: 0 };
   for (const test of cases) counts[test.status]++;
   return { ...meta, counts, total: cases.length };
@@ -281,7 +348,7 @@ async function route(req, res) {
       throw bad('Tùy chọn xóa lịch sử không hợp lệ.');
     }
     const removedRuns = input.deleteHistory ? state.runs.filter(run => run.suite.id === match[1]) : [];
-    if (removedRuns.some(run => ['queued', 'running'].includes(run.status))) {
+    if (removedRuns.some(run => activeStatuses.includes(run.status))) {
       throw bad('Bộ test có lần chạy đang thực thi hoặc đang chờ. Hãy đợi hoàn tất để xóa lịch sử.', 409);
     }
 
@@ -314,11 +381,18 @@ async function route(req, res) {
       const input = await body(req);
       const suite = state.suites.find(suite => suite.id === input.suiteId);
       if (!suite) throw bad('Hãy chọn bộ test.');
+      const build = field(input, 'build', 96, true);
+      const snapshot = { ...suite };
+      const selectedCase = input.caseId === undefined ? undefined :
+        await selectCase(snapshot, field(input, 'caseId', 256, true));
+      if (!state.suites.includes(suite)) throw bad('Không tìm thấy bộ test.', 404);
       const run = {
         id: randomUUID(),
-        suite: { ...suite },
-        build: field(input, 'build', 96, true),
+        suite: snapshot,
+        build,
+        ...(selectedCase && { selectedCase }),
         regression: input.regression === true,
+        headed: input.headed === true,
         createdAt: new Date().toISOString(),
         status: 'queued',
         cases: [],
@@ -328,6 +402,13 @@ async function route(req, res) {
       work();
       return json(res, 202, summary(run));
     }
+  }
+  const stop = pathname.match(/^\/api\/runs\/([a-f0-9-]+)\/stop$/);
+  if (stop && method === 'POST') {
+    const run = state.runs.find(item => item.id === stop[1]);
+    if (!run) throw bad('Không tìm thấy lần chạy.', 404);
+    stopRun(run);
+    return json(res, 202, summary(run));
   }
   match = pathname.match(/^\/api\/runs\/([a-f0-9-]+)(?:\/(log|artifacts|report))?$/);
   if (match && method === 'GET') {
@@ -348,7 +429,7 @@ async function route(req, res) {
 }
 
 const port = Number(process.env.PORT || 4173);
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   if (!/^((127\.0\.0\.1)|(localhost))(?::\d+)?$/.test(req.headers.host || '') && !isTailnetRequest(req)) {
@@ -360,6 +441,7 @@ http.createServer((req, res) => {
   });
 }).listen(port, '127.0.0.1', () => {
   loadState();
-  console.log('HRW Playwright · http://localhost:' + port);
+  const actualPort = server.address().port;
+  console.log('HRW Playwright · http://localhost:' + actualPort);
   work();
 });

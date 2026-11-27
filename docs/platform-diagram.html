@@ -39,7 +39,7 @@
   <header>
     <p class="eyebrow">HRW PLAYWRIGHT · TÀI LIỆU KỸ THUẬT</p>
     <h1>Kiến trúc Platform regression</h1>
-    <p>Hiện trạng theo mã nguồn ngày 26/11/2026. Platform quản lý bộ test, điều phối Playwright và đối chiếu kết quả giữa các lần chạy.</p>
+    <p>Hiện trạng theo mã nguồn ngày 27/11/2026. Platform quản lý bộ test, điều phối Playwright và đối chiếu kết quả giữa các lần chạy.</p>
     <nav aria-label="Mục lục">
       <a href="#kien-truc">Kiến trúc</a>
       <a href="#vong-doi">Vòng đời lần chạy</a>
@@ -126,7 +126,8 @@
     </div>
     <ul>
       <li><strong>Khởi động.</strong> <code>npm start</code> chạy Node HTTP trên <code>127.0.0.1</code>, mặc định cổng <code>4173</code>. Server kiểm tra Host và Origin nếu có. Có nhánh hỗ trợ yêu cầu do Tailnet chuyển tiếp theo cấu hình <code>HRW_TAILSCALE_HOST</code>.</li>
-      <li><strong>Chọn test.</strong> Playwright đọc test từ checkout trên máy chạy Platform. Suite lưu tên, mô tả, môi trường và tag. API checklist gọi Playwright với <code>--list</code> để đọc case và annotation; khi thực thi, CLI chọn thư mục theo môi trường và lọc tag nếu có. Mã build là nhãn để tra cứu và so sánh.</li>
+      <li><strong>Chọn test.</strong> Playwright đọc test từ checkout trên máy chạy Platform. Suite lưu tên, mô tả, môi trường và tag. API checklist gọi Playwright với <code>--list</code> để đọc case và annotation; khi thực thi, CLI chọn thư mục theo môi trường và lọc tag nếu có. Với lần chạy một case, <code>selectCase()</code> xác thực <code>caseId</code> và runner dùng <code>--test-list</code> để định danh case bằng project, tệp và tên đầy đủ. Mã build là nhãn để tra cứu và so sánh.</li>
+      <li><strong>Quan sát trình duyệt.</strong> Tùy chọn Hiện trình duyệt lưu <code>headed</code> trên lần chạy. Runner thêm <code>--headed</code> để mở cửa sổ trên máy Platform. Trang kết quả có thể tạo lần chạy mới cùng phạm vi. <code>platform-test.js</code> ngắt kết nối điều khiển khi test kết thúc; <code>inspection-browser.js</code> giữ trang và phiên đăng nhập cho đến khi người dùng đóng cửa sổ.</li>
       <li><strong>Lưu dữ liệu.</strong> <code>state.json</code> chứa cấu hình suite và lịch sử, gồm bản sao suite và kết quả case theo lần chạy. Thư mục <code>&lt;run-id&gt;/</code> chứa <code>run.log</code>, <code>results.json</code> và <code>artifacts/</code> khi có. Đường dẫn gốc mặc định là <code>.platform-data/</code>, có thể đổi qua <code>HRW_DATA_DIR</code>.</li>
     </ul>
   </section>
@@ -135,7 +136,7 @@
     <div class="diagram-container" tabindex="0" aria-label="Vòng đời lần chạy">
       <svg viewBox="0 0 1280 720" role="img" aria-labelledby="run-state-title run-state-desc">
         <title id="run-state-title">Vòng đời lần chạy</title>
-        <desc id="run-state-desc">Một lần chạy từ hàng đợi chuyển sang đang chạy rồi kết thúc bằng passed, failed hoặc error.</desc>
+        <desc id="run-state-desc">Một lần chạy từ hàng đợi chuyển sang đang chạy, sau đó hoàn tất, gặp lỗi hoặc đi qua nhánh dừng.</desc>
         <defs>
           <marker id="run-state-flow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#4f5d75"/></marker>
           <marker id="run-state-http" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#2e5aa8"/></marker>
@@ -157,6 +158,12 @@
         <path d="M 736,384 H 828 Q 836,384 836,392 V 520 Q 836,528 844,528 H 948" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#run-state-flow)"/>
         <rect x="864.5" y="505" width="61" height="16" rx="2" fill="#f5f5f5"/>
         <text class="arrow-label" x="895" y="518" text-anchor="middle">LỖI RUN</text>
+        <path d="M 616,416 V 488" fill="none" stroke="#2e5aa8" stroke-width="1.5" marker-end="url(#run-state-http)"/>
+        <rect x="624" y="444" width="52" height="16" rx="2" fill="#f5f5f5"/>
+        <text class="arrow-label" x="650" y="456" text-anchor="middle">DỪNG</text>
+        <path d="M 496,544 H 264" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#run-state-flow)"/>
+        <rect x="332" y="521" width="96" height="16" rx="2" fill="#f5f5f5"/>
+        <text class="arrow-label" x="380" y="534" text-anchor="middle">RUNNER THOÁT</text>
         <g id="queued" data-node-id="queued" transform="translate(64 288)">
           <rect width="200" height="128" rx="6" fill="#ffffff" stroke="#2d3142"/>
           <text class="tag" x="16" y="21" fill="#2d3142">ĐANG CHỜ</text>
@@ -185,7 +192,19 @@
           <rect width="240" height="112" rx="6" fill="#ffffff" stroke="#2d3142"/>
           <text class="tag" x="16" y="21" fill="#2d3142">LỖI THỰC THI</text>
           <text class="name" x="16" y="48">error</text>
-          <text class="sub" x="16" y="70">Báo cáo / runner lỗi</text><text class="sub" x="16" y="86">Hoặc gián đoạn khi dừng</text>
+          <text class="sub" x="16" y="70">Báo cáo / runner lỗi</text><text class="sub" x="16" y="86">Hoặc Platform gián đoạn</text>
+        </g>
+        <g id="stopping" data-node-id="stopping" transform="translate(496 488)">
+          <rect width="240" height="112" rx="6" fill="#f8ebe7" stroke="#bf4520"/>
+          <text class="tag" x="16" y="21">ĐANG DỪNG</text>
+          <text class="name" x="16" y="48">stopping</text>
+          <text class="sub" x="16" y="70">SIGINT · buộc dừng sau 3 s</text>
+        </g>
+        <g id="stopped" data-node-id="stopped" transform="translate(64 488)">
+          <rect width="200" height="112" rx="6" fill="#ffffff" stroke="#2d3142"/>
+          <text class="tag" x="16" y="21">ĐÃ DỪNG</text>
+          <text class="name" x="16" y="48">stopped</text>
+          <text class="sub" x="16" y="70">Tiếp tục hàng đợi</text>
         </g>
 <path d="M 40,648 H 1240" stroke="#bfc0c0"/>
 <text class="sub" x="40" y="677">Nhánh được quyết định khi tiến trình con kết thúc hoặc khi Platform phục hồi trạng thái lúc khởi động.</text>
@@ -193,8 +212,9 @@
     </div>
     <ul>
       <li><code>POST /api/runs</code> lưu lần chạy, gọi bộ điều phối và trả HTTP 202. Một tiến trình chạy test tại một thời điểm; API checklist có thể khởi chạy riêng một tiến trình liệt kê.</li>
-      <li>Trong lúc chờ hoặc đang chạy, trang chi tiết đọc lại API mỗi 800 ms. Reporter đẩy tiến độ qua stdout/stderr; server ghi vào log và đọc JSON khi tiến trình con kết thúc.</li>
-      <li>Điều kiện <code>error</code> được xét trước <code>passed</code> và <code>failed</code>: lỗi cấp báo cáo, thiếu báo cáo/case hoặc exit khác 0 mà không có case <code>unexpected</code>. Khi khởi động lại, lần chạy còn <code>running</code> chuyển sang <code>error</code> và hàng đợi tiếp tục.</li>
+      <li>Trong lúc chờ, đang chạy hoặc đang dừng, trang chi tiết đọc lại API mỗi 800 ms. Reporter đẩy tiến độ qua stdout/stderr; server ghi vào log và đọc JSON khi tiến trình con kết thúc.</li>
+      <li><code>POST /api/runs/&lt;id&gt;/stop</code> chuyển <code>running</code> sang <code>stopping</code>, gửi tín hiệu ngay và giữ chỗ trong hàng đợi đến khi runner thoát. Lịch sử ghi phạm vi và trạng thái dừng. Chỉ so sánh hai lần hoàn tất cùng Test Script và cùng phạm vi.</li>
+      <li>Điều kiện <code>error</code> được xét trước <code>passed</code> và <code>failed</code>: lỗi cấp báo cáo, thiếu báo cáo/case hoặc exit khác 0 mà không có case <code>unexpected</code>. Khi khởi động lại, lần chạy còn <code>running</code> chuyển sang <code>error</code>, lần còn <code>stopping</code> chuyển sang <code>stopped</code> và hàng đợi tiếp tục.</li>
     </ul>
   </section>
   <section id="tham-chieu">
@@ -203,9 +223,9 @@
       <table>
         <thead><tr><th scope="col">Khi phát triển</th><th scope="col">Vị trí trong repo</th><th scope="col">Hành vi hiện tại</th></tr></thead>
         <tbody>
-          <tr><td>Đổi màn hình hoặc điều hướng</td><td><a href="../platform/public/app.js">app.js</a> · <a href="../platform/public/index.html">index.html</a> · <a href="../platform/public/style.css">style.css</a></td><td><code>render()</code> điều hướng theo hash; <code>comparison()</code> so khớp ID case ở hai run của cùng suite.</td></tr>
+          <tr><td>Đổi màn hình hoặc điều hướng</td><td><a href="../platform/public/app.js">app.js</a> · <a href="../platform/public/index.html">index.html</a> · <a href="../platform/public/style.css">style.css</a></td><td><code>render()</code> điều hướng theo hash; <code>comparison()</code> so khớp ID case ở hai run của cùng suite và cùng phạm vi.</td></tr>
           <tr><td>Thay API suite hoặc checklist</td><td><a href="../platform/server.js">server.js</a> · <a href="../fixtures/checklist.js">checklist.js</a></td><td><code>route()</code> xử lý suite CRUD; <code>suiteValues()</code> kiểm tra dữ liệu; <code>listSuiteCases()</code> đọc annotation checklist.</td></tr>
-          <tr><td>Đổi hàng đợi hoặc lưu trữ</td><td><a href="../platform/server.js">server.js</a></td><td><code>work()</code>, <code>loadState()</code> và <code>save()</code> quản lý tiến trình con, phục hồi và ghi JSON qua tệp tạm. Xóa lịch sử bị từ chối khi có run đang chờ hoặc đang chạy.</td></tr>
+          <tr><td>Đổi hàng đợi hoặc lưu trữ</td><td><a href="../platform/server.js">server.js</a></td><td><code>work()</code>, <code>stopRun()</code>, <code>loadState()</code> và <code>save()</code> quản lý tiến trình con, phục hồi và ghi JSON qua tệp tạm. Xóa lịch sử bị từ chối khi có run đang chờ, đang chạy hoặc đang dừng.</td></tr>
           <tr><td>Thêm test hoặc môi trường</td><td><a href="../tests/production/">tests/production</a> · <a href="../tests/staging/">tests/staging</a> · <a href="../environments/index.js">environments/index.js</a></td><td>Production chứa HaraWorks và Thư Nội Bộ; staging chứa đăng nhập Zuizui và giỏ hàng mẫu. <code>playwrightArgs()</code> chọn thư mục và lọc tag.</td></tr>
           <tr><td>Đổi log, kết quả hoặc artifact</td><td><a href="../platform/reporter.js">reporter.js</a> · <a href="../playwright.config.js">playwright.config.js</a> · <a href="../platform/server.js">server.js</a></td><td>Reporter tùy chỉnh ghi tiến độ; JSON reporter tạo dữ liệu cho <code>readResults()</code>. API run cung cấp chi tiết, log, JSON và artifact.</td></tr>
         </tbody>

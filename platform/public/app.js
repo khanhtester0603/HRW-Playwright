@@ -2,13 +2,13 @@ const app = document.querySelector('#app');
 const dialog = document.querySelector('#suite-dialog');
 const suiteForm = document.querySelector('#suite-form');
 const labels = {
-  queued: 'Chờ chạy', running: 'Đang chạy', passed: 'Pass', failed: 'Fail', error: 'Lỗi runner',
+  queued: 'Chờ chạy', running: 'Đang chạy', stopping: 'Đang dừng', stopped: 'Đã dừng', passed: 'Pass', failed: 'Fail', error: 'Lỗi runner',
   expected: 'Pass', unexpected: 'Fail', flaky: 'Flaky', skipped: 'Skip',
   regressed: 'Mới fail', fixed: 'Đã pass lại', added: 'Case mới', removed: 'Đã bỏ', changed: 'Đổi trạng thái',
 };
 const pageNames = { home: 'Tổng quan', suites: 'Test Script', execute: 'Thực thi', reports: 'Báo cáo & so sánh' };
 const formatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
-const pending = run => ['queued', 'running'].includes(run.status);
+const pending = run => ['queued', 'running', 'stopping'].includes(run.status);
 const completed = run => ['passed', 'failed'].includes(run.status);
 const environments = {
   staging: { label: 'Staging', url: 'https://zuizui.io' },
@@ -46,7 +46,8 @@ const logText = run => run.log || (pending(run) ? 'Đang chờ nhật ký từ P
 const elapsed = run => run.startedAt && run.finishedAt ? new Date(run.finishedAt) - new Date(run.startedAt) : null;
 const runUrl = run => '#run/' + run.id;
 const apiUrl = run => '/api/runs/' + run.id;
-const runTitle = run => run.build + ' · ' + run.suite.name;
+const runScope = run => run.selectedCase ? 'Case: ' + run.selectedCase.title : 'Toàn bộ Test Script';
+const runTitle = run => run.build + ' · ' + run.suite.name + ' · ' + runScope(run);
 const link = (url, label, style = 'text-link') => '<a class="' + style + '" href="' + e(url) + '">' + e(label) + '</a>';
 const primary = (url, label) => link(url, label, 'button primary');
 const empty = (icon, title, message) => `<div class="empty"><span aria-hidden="true">${icon}</span><strong>${e(title)}</strong><p>${e(message)}</p></div>`;
@@ -62,8 +63,8 @@ function table(headers, rows) {
 
 function history(list) {
   if (!list.length) return empty('◷', 'Chưa có lần chạy', 'Chạy một Test Script để tạo báo cáo đầu tiên.');
-  return table(['Bản build', 'Test Script', 'Trạng thái', 'Thời điểm'], list.map(run => [
-    link(runUrl(run), run.build), e(run.suite.name), badge(run.status), e(date(run.createdAt)),
+  return table(['Bản build', 'Test Script', 'Phạm vi', 'Trạng thái', 'Thời điểm'], list.map(run => [
+    link(runUrl(run), run.build), e(run.suite.name), e(runScope(run)), badge(run.status), e(date(run.createdAt)),
   ]));
 }
 
@@ -192,7 +193,7 @@ function filterableHistory(limit = 0) {
     <label>Tìm trong lịch sử<input type="search" data-history-filter placeholder="Nhập mã build hoặc tên Test Script"></label>
     <label>Trạng thái<select aria-label="Trạng thái" data-history-filter>
       ${option('', 'Tất cả trạng thái')}
-      ${['queued', 'running', 'passed', 'failed', 'error'].map(status => option(status, labels[status])).join('')}
+      ${['queued', 'running', 'stopping', 'stopped', 'passed', 'failed', 'error'].map(status => option(status, labels[status])).join('')}
     </select></label>
   </div>
   <div data-history-list="${limit}" aria-live="polite">${history(limit ? runs.slice(0, limit) : runs)}</div>`;
@@ -259,6 +260,7 @@ function manageSuites() {
 function suiteDetail({ suite, cases }) {
   const items = cases.map(test => `<details class="checklist-case">
     <summary>${e(test.title)} <span class="checklist-count">${test.steps.length} bước</span></summary>
+    <div class="case-actions">${link('#execute/' + suite.id + '/case/' + encodeURIComponent(test.id), '▷ Chạy case', 'button secondary')}</div>
     ${test.steps.length ? `<ol>${test.steps.map(step => `<li>${e(step)}</li>`).join('')}</ol>`
       : '<p>Case này chưa khai báo các bước.</p>'}
   </details>`).join('');
@@ -271,16 +273,24 @@ function suiteDetail({ suite, cases }) {
       : empty('▤', 'Chưa có case', 'Kiểm tra môi trường và tag của Test Script.'));
 }
 
-function execute() {
+function execute(suite, selectedCase) {
   const form = `<form id="run-form" class="panel-body">
     <div class="form-error" role="alert" hidden></div>
     <div class="form-grid">
-      ${searchableSelect('suite-select', 'suiteId', 'Test Script', 'Chọn Test Script')}
+      ${selectedCase ? `<div><strong>${e(suite.name)}</strong><p>${e(selectedCase.title)}</p>
+        <input type="hidden" name="suiteId" value="${e(suite.id)}">
+        <input type="hidden" name="caseId" value="${e(selectedCase.id)}"></div>`
+        : searchableSelect('suite-select', 'suiteId', 'Test Script', 'Chọn Test Script')}
       <label>Mã build<input name="build" required maxlength="96" placeholder="Ví dụ build-142 hoặc commit SHA"></label>
     </div>
-    <button class="button primary">▷ Bắt đầu chạy</button>
+    <label class="headed-option"><input type="checkbox" name="headed">
+      <span>Hiện trình duyệt<br><small>Giữ cửa sổ trên máy chạy Platform sau khi test kết thúc.</small></span>
+    </label>
+    <button class="button primary">▷ Run test</button>
   </form>`;
-  return head('Thực thi Test Script', 'Chọn Test Script và gắn mã build để truy lại kết quả.') +
+  return head(selectedCase ? 'Thực thi một test case' : 'Thực thi Test Script',
+    selectedCase ? 'Nhập mã build cho case đã chọn.' : 'Chọn Test Script và gắn mã build để truy lại kết quả.',
+    selectedCase ? link('#suites/' + suite.id, '‹ Về Test Script') : '') +
     panel('Cấu hình lần chạy', suites.length ? form : empty('▤', 'Cần có ít nhất một Test Script', 'Tạo Test Script trong trang quản lý trước khi chạy.'), suites.length ? '' : link('#suites', 'Quản lý Test Script')) +
     panel('Lần chạy gần đây', filterableHistory(5));
 }
@@ -296,7 +306,21 @@ function runPage(run) {
     test.error ? link(runUrl(run) + '/case/' + encodeURIComponent(test.id), test.title) : e(test.title),
     e(test.file), badge(test.status), e(duration(test.duration)),
   ]);
-  return head(run.build, run.suite.name + ' · ' + date(run.createdAt) + (run.finishedAt ? ' · ' + duration(elapsed(run)) : ''), badge(run.status)) +
+  const action = run.status === 'running' ? `<form id="stop-form" data-run-id="${e(run.id)}">
+    <button class="button secondary danger">Dừng</button>
+  </form>` : '';
+  const replay = !pending(run) && suites.some(suite => suite.id === run.suite.id) ? `<form id="run-form">
+    <input type="hidden" name="suiteId" value="${e(run.suite.id)}">
+    <input type="hidden" name="build" value="${e(run.build)}">
+    <input type="hidden" name="headed" value="1">
+    ${run.regression ? '<input type="hidden" name="regression" value="1">' : ''}
+    ${run.selectedCase ? '<input type="hidden" name="caseId" value="' + e(run.selectedCase.id) + '">' : ''}
+    <button class="button secondary">Chạy lại có trình duyệt</button>
+  </form>` : '';
+  return head(run.build, run.suite.name + ' · ' + runScope(run) + ' · ' +
+    (run.headed ? 'Có cửa sổ trình duyệt · ' : '') + date(run.createdAt) + (run.finishedAt ? ' · ' + duration(elapsed(run)) : ''),
+    '<div class="actions">' + badge(run.status) + action + replay + '</div>') +
+    '<div id="stop-error" class="form-error" role="alert" hidden></div>' +
     (pending(run) ? '' : totals) +
     (run.error ? '<div class="form-error" role="alert">' + e(run.error) + '</div>' : '') +
     (rows.length ? panel('Kết quả test case', table(['Test case', 'Tệp', 'Trạng thái', 'Thời gian'], rows), link(apiUrl(run) + '/report', 'Tải JSON')) : '') +
@@ -319,7 +343,7 @@ function casePage(run, test) {
 
 function reports() {
   const available = runs.filter(completed);
-  return head('Báo cáo & so sánh', 'Đối chiếu hai lần chạy của cùng Test Script và tìm các case đổi trạng thái.') +
+  return head('Báo cáo & so sánh', 'Đối chiếu hai lần chạy cùng Test Script và cùng phạm vi.') +
     panel('So sánh lần chạy', available.length > 1 ? `<div class="panel-body">
       <form id="compare-form">
         <div class="form-grid">
@@ -446,15 +470,20 @@ deleteForm.addEventListener('submit', async event => {
 
 app.addEventListener('submit', async event => {
   const form = event.target;
-  if (!['run-form', 'compare-form'].includes(form.id)) return;
+  if (!['run-form', 'compare-form', 'stop-form'].includes(form.id)) return;
   event.preventDefault();
   const button = form.querySelector('button');
   const values = new FormData(form);
   button.disabled = true;
   try {
-    if (form.id === 'run-form') {
+    if (form.id === 'stop-form') {
+      await api('/api/runs/' + form.dataset.runId + '/stop', 'POST');
+      if (form.isConnected) await render();
+    } else if (form.id === 'run-form') {
       const run = await api('/api/runs', 'POST', {
         build: values.get('build'), suiteId: values.get('suiteId'),
+        ...(values.has('caseId') && { caseId: values.get('caseId') }),
+        headed: values.has('headed'), regression: values.has('regression'),
       });
       location.hash = runUrl(run);
     } else {
@@ -463,11 +492,18 @@ app.addEventListener('submit', async event => {
       if (baseId === targetId) throw new Error('Hãy chọn hai lần chạy khác nhau.');
       const [base, target] = await Promise.all([api('/api/runs/' + baseId), api('/api/runs/' + targetId)]);
       if (base.suite.id !== target.suite.id) throw new Error('Hãy chọn hai lần chạy của cùng một Test Script.');
+      if (!completed(base) || !completed(target) || base.selectedCase?.id !== target.selectedCase?.id) {
+        throw new Error('Hãy chọn hai lần chạy hoàn tất có cùng phạm vi kiểm thử.');
+      }
       const output = document.querySelector('#comparison');
       if (output) output.innerHTML = comparison(base, target);
     }
   } catch (error) {
-    if (form.id === 'run-form') showError(form.querySelector('.form-error'), error);
+    if (form.id === 'stop-form') {
+      if (form.isConnected) showError(document.querySelector('#stop-error'), error);
+    } else if (form.id === 'run-form') {
+      if (form.isConnected) showError(form.querySelector('.form-error') || document.querySelector('#stop-error'), error);
+    }
     else {
       const output = document.querySelector('#comparison');
       if (output) output.innerHTML = '<div class="form-error" role="alert">' + e(error.message) + '</div>';
@@ -517,6 +553,14 @@ async function render() {
       if (pending(run)) refresh = setTimeout(render, 800);
     } else if (page === 'suites') app.innerHTML = manageSuites();
     else if (page === 'execute') {
+      if (subpage === 'case' && id) {
+        const { suite, cases } = await api('/api/suites/' + encodeURIComponent(id) + '/cases');
+        if (token !== generation) return;
+        const selectedCase = cases.find(test => test.id === decodeURIComponent(caseId));
+        if (!selectedCase) throw new Error('Case không còn thuộc Test Script. Hãy mở lại checklist.');
+        app.innerHTML = execute(suite, selectedCase);
+        return;
+      }
       app.innerHTML = execute();
       const combo = app.querySelector('[data-combobox]');
       if (combo) bindCombobox(combo, suites.find(suite => suite.id === id)?.id || suites[0].id);

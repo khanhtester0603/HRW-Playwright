@@ -5,15 +5,57 @@ Các case nằm trong `tests/staging/cart.spec.js` và dùng trang demo tại `f
 
 ## Cài đặt và chạy
 
+Cài Node.js 22.12 trở lên, lấy mã nguồn dự án và mở terminal trong thư mục chứa
+`package.json`. Bộ test giỏ hàng mẫu chạy được ngay. Để chạy HaraWorks hoặc
+Zuizui, cấu hình tài khoản test theo các mục tương ứng bên dưới.
+
+### macOS
+
+Cài các gói của dự án và Chromium cho Playwright.
+
 ```sh
+node --version
 npm ci
 npx playwright install chromium
-npm test
 npm run test:smoke
 ```
 
-`npm test` chạy cả ba case. Lệnh smoke chạy hai case kiểm tra giỏ hàng ban đầu
-và luồng thêm sản phẩm. Case regression còn lại kiểm tra thao tác xóa giỏ hàng.
+Để mở Platform web:
+
+```sh
+npm start
+```
+
+Mở [HRW Playwright](http://localhost:4173) trong trình duyệt. Cổng mặc định là
+`4173`.
+
+### Windows
+
+Mở PowerShell trong thư mục dự án và chạy:
+
+```powershell
+node --version
+npm.cmd ci
+npx.cmd playwright install chromium
+npm.cmd run test:smoke
+```
+
+Để xem trình duyệt trong lúc chạy, dùng một trong hai lệnh sau:
+
+```powershell
+# Chạy bộ smoke có cửa sổ trình duyệt
+npm.cmd run test:smoke -- --headed
+
+# Chạy riêng case giỏ hàng ở dòng 23
+npx.cmd playwright test "cart.spec.js:23" --headed
+```
+
+Dùng `npm.cmd start` để mở giao diện web tại
+[http://localhost:4173](http://localhost:4173). Hiện tại, hãy thực thi test từ
+PowerShell vì bộ lọc đường dẫn của runner Platform chưa hỗ trợ đường dẫn Windows.
+
+`npm test` trên macOS hoặc `npm.cmd test` trên Windows chạy cả ba case giỏ hàng.
+Lệnh smoke chỉ chạy hai case kiểm tra giỏ trống và thêm sản phẩm.
 
 ## Tạo hai lần chạy để đối chiếu
 
@@ -38,26 +80,36 @@ và trace. Báo cáo mặc định được ghi lại ở lần chạy tiếp th
 
 ## Platform regression
 
-```sh
-npm ci
-npx playwright install chromium
-npm start
-```
-
-Mở [HRW Playwright](http://localhost:4173) trong trình duyệt. Nếu đã có Google
-Chrome, có thể chạy `HRW_BROWSER_CHANNEL=chrome npm start` trên macOS/Linux.
+Các thao tác thực thi qua giao diện dưới đây áp dụng trên macOS. Với bản web,
+mở [HRW Playwright](http://localhost:4173) sau khi chạy `npm start`. Nếu đã có
+Google Chrome, có thể dùng `HRW_BROWSER_CHANNEL=chrome npm start` trên macOS.
 
 1. Vào **Bộ test** để tạo, sửa hoặc xóa cấu hình chạy. Test case Playwright nằm
    trong thư mục `tests/`. Gán tag cho case trong mã nguồn, rồi nhập cùng tag
    vào cấu hình bộ test. Chọn Staging hoặc Production trước khi lưu. Để trống tag
    để chạy toàn bộ case trong môi trường đã chọn.
 2. Vào **Thực thi**, chọn bộ test, nhập mã build và bắt đầu chạy. Nhật ký cập
-   nhật trong lúc Playwright thực thi.
-3. Sau khi chạy xong, mở test case có lỗi để xem lỗi, ảnh chụp và tải trace.
+   nhật trong lúc Playwright thực thi. Để chạy riêng một case, mở **Chi tiết**
+   của Test Script, mở case trong checklist, chọn **Chạy case** rồi nhập mã build.
+3. Trong trang chi tiết lần chạy, chọn **Dừng** khi trạng thái là **Đang chạy**.
+   Platform gửi tín hiệu dừng ngay, cho runner tối đa 3 giây để thoát trước khi
+   buộc dừng, rồi hiển thị **Đã dừng** và tiếp tục hàng đợi. Nhật ký đã ghi vẫn
+   xem được. Các thao tác đã thực hiện trên ứng dụng đích vẫn có hiệu lực.
+4. Sau khi chạy xong, mở test case có lỗi để xem lỗi, ảnh chụp và tải trace.
    Có thể mở trace đã tải bằng `npx playwright show-trace trace.zip`.
-4. Vào **Báo cáo & so sánh** và chọn hai lần chạy của cùng bộ test. Màn hình
-   hiển thị tổng số pass/fail, chênh lệch thời gian và các case đổi trạng thái,
+5. Vào **Báo cáo & so sánh** và chọn hai lần chạy hoàn tất của cùng Test Script
+   và cùng phạm vi, toàn bộ script hoặc cùng một case. Màn hình hiển thị tổng số pass/fail, chênh lệch thời gian và các case đổi trạng thái,
    được thêm hoặc bị bỏ.
+
+[Xem sơ đồ Platform](docs/platform-diagram.html).
+
+Bật **Hiện trình duyệt** trước khi chạy Test Script hoặc test case để quan sát
+Playwright trong cửa sổ thật trên máy chạy Platform. Từ trang kết quả, chọn
+**Chạy lại có trình duyệt** để tạo một lần chạy mới cùng mã build và phạm vi.
+Nếu mở Platform từ máy khác, cửa sổ xuất hiện trên máy chạy runner. Chế độ
+này cần phiên giao diện đồ họa đang hoạt động trên máy đó. Cửa sổ giữ nguyên trang cuối
+sau khi Platform ghi kết quả. Bạn có thể thao tác trên trang để kiểm chứng rồi
+tự đóng cửa sổ. Một bộ test có thể mở nhiều cửa sổ để giữ riêng từng phiên đăng nhập.
 
 Runner chạy lần lượt theo hàng đợi và lưu lịch sử, log, JSON và tệp đính kèm
 trong `.platform-data/`. Chạy một instance cho mỗi thư mục dữ liệu. Có thể
@@ -76,8 +128,11 @@ curl http://localhost:4173/api/runs \
 ```
 
 API trả HTTP 202 cùng ID lần chạy. Dùng `GET /api/runs/<id>` để theo dõi
-đến khi trạng thái là `passed`, `failed` hoặc `error`. Runner chỉ lắng nghe
-trên loopback.
+đến khi trạng thái là `passed`, `failed`, `error` hoặc `stopped`. Dùng
+`GET /api/suites/<suiteId>/cases` để lấy ID case và truyền thêm `caseId` trong
+JSON của `POST /api/runs` khi muốn chạy riêng. Truyền thêm `"headed": true` để mở cửa sổ trình duyệt. Dùng `POST /api/runs/<id>/stop`
+để dừng lần đang chạy. API trả HTTP 202 và chuyển trạng thái qua `stopping`
+đến `stopped`. Runner lắng nghe trên loopback.
 
 ### Bộ test đăng nhập Zuizui
 
